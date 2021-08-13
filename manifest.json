@@ -1,11 +1,19 @@
 {
   "manifest_version": 2,
-  "name": "SOUND CONTROL NEW TEST",
+  "name": "Sound Control",
   "description": "Allows you to control every tabs volume seperately",
   "version": "1.0.0",
   "browser_action": {
     "default_popup": "html/popup.html",
-    "default_title": "Opera Tab Volume Control"
+    "default_title": "Sound Control",
+    "default_icon": {
+      "48": "image/48.png",
+      "128": "image/128.png"
+    }
+  },
+  "icons": {
+    "48": "image/48.png",
+    "128": "image/128.png"
   },
   "background": {
     "scripts": [
