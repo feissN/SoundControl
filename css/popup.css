@@ -42,7 +42,7 @@ body {
     width: 20px;
     height: 20px;
     border-radius: 50%;
-    background: #04aa6d;
+    background: #05db8d;
     cursor: pointer;
 }
 
@@ -50,7 +50,7 @@ body {
     width: 20px;
     height: 20px;
     border-radius: 50%;
-    background: #04aa6d;
+    background: #05db8d;
     cursor: pointer;
 }
 
@@ -59,4 +59,8 @@ body {
     font: 2.4em monospace;
     color: #d3d3d3;
     margin: 8px;
+}
+
+.controls h2 {
+    color: #d3d3d3;
 }
