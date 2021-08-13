@@ -52,7 +52,7 @@ async function renderTabsAudible() {
                 let html = `
                     <div class="tab" data-tab-id="${tab.id}" data-window-id="${tab.windowId}">
                         <div class="tab_item" title="${tab.title}">${tab.title}</div>
-                        <div class="tab_item tab_value">${parseInt(response * 100)}%</div>
+                        <div class="tab_value">${parseInt(response * 100)}%</div>
                     </div>`;
                 document.querySelector('.js-tabs-audible').innerHTML += html;
             });

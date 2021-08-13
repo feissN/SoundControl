@@ -15,13 +15,20 @@ body {
 }
 
 .tab_item {
-    font-size: 1.2em;
+    font-size: 1.3em;
     cursor: pointer;
     display: block;
     overflow: hidden;
     white-space: nowrap;
     text-overflow: ellipsis;
     color: #999999
+}
+
+.tab_value {
+    font-size: 1.3em;
+    display: block;
+    color: #d3d3d3;
+    margin-left: 5px;
 }
 
 .slider {
