@@ -21,7 +21,7 @@ body {
     overflow: hidden;
     white-space: nowrap;
     text-overflow: ellipsis;
-    color: #999999
+    color: #999999;
 }
 
 .tab_value {
