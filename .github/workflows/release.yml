@@ -1,0 +1,36 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build extension ZIP
+        run: |
+          zip -r sound-control.zip manifest.json html/ css/ js/ image/
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: Sound Control ${{ github.ref_name }}
+          body: |
+            ## Installation
+
+            1. Download **sound-control.zip** below and unzip it anywhere on your computer.
+            2. Open Chrome and go to `chrome://extensions`.
+            3. Enable **Developer mode** (toggle in the top-right corner).
+            4. Click **Load unpacked** and select the unzipped `SoundControl` folder.
+
+            See the [README](https://github.com/${{ github.repository }}#installation) for detailed steps with screenshots.
+          files: sound-control.zip
+          generate_release_notes: false

@@ -1,85 +1,73 @@
 'use strict';
 
-let getActiveTab = function (cb) {
-    chrome.tabs.query({ active: true, currentWindow: true }, function (tabs) {
-        cb(tabs);
-    })
+const slider = document.querySelector('.slider');
+const valueDisplay = document.querySelector('.slider-value');
+const tabsList = document.querySelector('.js-tabs-audible');
+
+async function getActiveTab() {
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    return tab;
 }
 
-let getAllTabsAudible = function (cb) {
-    chrome.tabs.query({ audible: true }, function (tabs) {
-        cb(tabs);
-    });
-};
+async function getTabVolume(tabId) {
+    return chrome.runtime.sendMessage({ name: 'get-tab-volume', tabId });
+}
 
+async function setTabVolume(tabId, value) {
+    return chrome.runtime.sendMessage({ name: 'set-tab-volume', tabId, value });
+}
 
-const slider = document.querySelector(".slider");
-
-(() => {
-    getActiveTab(function (tabs) {
-        const message = { name: 'get-tab-volume', tabId: tabs[0].id };
-
-        chrome.runtime.sendMessage(message, response => {
-            slider.value = response * 100;
-            document.querySelector(".sliderContainer").querySelector("p").innerText = `${slider.value}%`
-        });
-    });
+// Initialize slider with the active tab's current volume
+(async () => {
+    const tab = await getActiveTab();
+    const volume = await getTabVolume(tab.id);
+    slider.value = volume * 100;
+    valueDisplay.textContent = `${Math.round(volume * 100)}%`;
 })();
 
-slider.addEventListener("input", e => {
-    const value = slider.value;
-    document.querySelector(".sliderContainer").querySelector("p").innerText = `${value}%`;
+slider.addEventListener('input', async () => {
+    const value = Number(slider.value);
+    valueDisplay.textContent = `${Math.round(value)}%`;
 
-    getActiveTab(function (tabs) {
-        const message = { name: 'set-tab-volume', tabId: tabs[0].id, value: value / 100 };
-
-        chrome.runtime.sendMessage(message, response => {
-            document.querySelector(".sliderContainer").querySelector("p").innerText = `${slider.value}%`;
-        });
-    });
+    const tab = await getActiveTab();
+    await setTabVolume(tab.id, value / 100);
 });
 
+// Render the list of all currently audible tabs
+(async () => {
+    const tabs = await chrome.tabs.query({ audible: true });
 
+    for (const tab of tabs) {
+        const volume = await getTabVolume(tab.id);
 
-/**
- * Render a list of all audible tabs
- */
-async function renderTabsAudible() {
-    getAllTabsAudible(function (tabs) {
-        for (let tab of tabs) {
-            const message = { name: 'get-tab-volume', tabId: tab.id };
-            chrome.runtime.sendMessage(message, response => {
-                let html = `
-                    <div class="tab" data-tab-id="${tab.id}" data-window-id="${tab.windowId}">
-                        <div class="tab_item" title="${tab.title}">${tab.title}</div>
-                        <div class="tab_value">${parseInt(response * 100)}%</div>
-                    </div>`;
-                document.querySelector('.js-tabs-audible').innerHTML += html;
-            });
-        }
-    });
-};
+        const tabEl = document.createElement('div');
+        tabEl.className = 'tab';
+        tabEl.dataset.tabId = tab.id;
+        tabEl.dataset.windowId = tab.windowId;
 
+        const titleEl = document.createElement('div');
+        titleEl.className = 'tab_item';
+        titleEl.title = tab.title;
+        titleEl.textContent = tab.title;
 
-/**
- * RUN
- */
-renderTabsAudible();
+        const valueEl = document.createElement('div');
+        valueEl.className = 'tab_value';
+        valueEl.textContent = `${Math.round(volume * 100)}%`;
 
-
-/**
- * Event listeners
- */
-document.querySelector('.js-tabs-audible').addEventListener('click', function (e) {
-    let targetEl = e.target;
-
-    // React to clicks on tab items only
-    if (targetEl.matches('.tab_item')) {
-        let tabEl = targetEl.closest('.tab');
-        let tabId = parseInt(tabEl.dataset.tabId);
-        let windowId = parseInt(tabEl.dataset.windowId);
-
-        chrome.windows.update(windowId, { focused: true });
-        chrome.tabs.update(tabId, { active: true });
+        tabEl.append(titleEl, valueEl);
+        tabsList.append(tabEl);
     }
+})();
+
+// Switch to a tab when its title is clicked
+tabsList.addEventListener('click', e => {
+    const tabItem = e.target.closest('.tab_item');
+    if (!tabItem) return;
+
+    const tabEl = tabItem.closest('.tab');
+    const tabId = parseInt(tabEl.dataset.tabId);
+    const windowId = parseInt(tabEl.dataset.windowId);
+
+    chrome.windows.update(windowId, { focused: true });
+    chrome.tabs.update(tabId, { active: true });
 });

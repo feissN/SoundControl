@@ -1,56 +1,71 @@
 'use strict';
 
-// Handle messages from popup
-chrome.runtime.onMessage.addListener(async (message, sender, respond) => {
+// Tracks the last-known volume per tab (reset when service worker is recycled)
+const tabVolumes = {};
+
+// Tracks which tabs currently have an active audio capture
+const capturedTabs = new Set();
+
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     switch (message.name) {
         case 'get-tab-volume':
-            respond(await getTabVolume(message.tabId))
-            break
+            sendResponse(tabVolumes[message.tabId] ?? 1);
+            return false;
+
         case 'set-tab-volume':
-            respond(undefined) // Nothing to send here.
-            console.log(message.tabId, message.value);
-            await setTabVolume(message.tabId, message.value)
-            break
+            handleSetVolume(message.tabId, message.value)
+                .then(() => sendResponse())
+                .catch(err => {
+                    console.error('[SoundControl] set-tab-volume failed:', err);
+                    sendResponse({ error: err.message });
+                });
+            return true; // keep the message channel open for the async response
+
         default:
-            throw Error(`Unknown message received: ${message}`)
+            return false;
     }
-})
+});
 
-const tabs = {}
+async function handleSetVolume(tabId, value) {
+    tabVolumes[tabId] = value;
 
-async function getTabVolume(tabId) {
-    return tabId in tabs ? (await tabs[tabId]).gainNode.gain.value : 1
-}
-
-async function setTabVolume(tabId, value) {
-    if (!(tabId in tabs)) {
-        captureTab(tabId)
+    if (!capturedTabs.has(tabId)) {
+        const streamId = await chrome.tabCapture.getMediaStreamId({ tabId });
+        await ensureOffscreenDocument();
+        await sendToOffscreen({ name: 'capture-tab', tabId, streamId });
+        capturedTabs.add(tabId);
     }
 
-    (await tabs[tabId]).gainNode.gain.value = value
+    await sendToOffscreen({ name: 'set-volume', tabId, value });
 }
 
-function captureTab(tabId) {
-    tabs[tabId] = new Promise(async resolve => {
-        chrome.tabCapture.capture({ audio: true, video: false }, stream => {
-            const audioContext = new AudioContext()
-            const streamSource = audioContext.createMediaStreamSource(stream)
-            const gainNode = audioContext.createGain()
-
-            streamSource.connect(gainNode)
-            gainNode.connect(audioContext.destination)
-
-            resolve({ audioContext, streamSource, gainNode })
-        })
-    })
-}
-
-// Clean everything up once the tab is closed
-chrome.tabs.onRemoved.addListener(disposeTab)
-
-async function disposeTab(tabId) {
-    if (tabId in tabs) {
-        (await tabs[tabId]).audioContext.close()
-        delete tabs[tabId]
+async function ensureOffscreenDocument() {
+    const existing = await chrome.runtime.getContexts({
+        contextTypes: ['OFFSCREEN_DOCUMENT'],
+    });
+    if (existing.length === 0) {
+        await chrome.offscreen.createDocument({
+            url: 'html/offscreen.html',
+            reasons: ['USER_MEDIA'],
+            justification: 'Capture tab audio stream for per-tab volume control',
+        });
     }
 }
+
+function sendToOffscreen(message) {
+    return chrome.runtime.sendMessage(message);
+}
+
+chrome.tabs.onRemoved.addListener(async (tabId) => {
+    delete tabVolumes[tabId];
+
+    if (capturedTabs.has(tabId)) {
+        capturedTabs.delete(tabId);
+        const existing = await chrome.runtime.getContexts({
+            contextTypes: ['OFFSCREEN_DOCUMENT'],
+        });
+        if (existing.length > 0) {
+            chrome.runtime.sendMessage({ name: 'dispose-tab', tabId });
+        }
+    }
+});
